@@ -14,6 +14,16 @@ Teachers manage approved student lists, create courses, and issue achievements t
 
 Authorization is teacher-centric: list membership is required to register achievements, and course links are validated against a teacher-owned `Course` PDA when `course_id` is set.
 
+## Evidence of functionality (devnet)
+
+End-to-end run via the ScholarFi Achievement Vault UI against program `7JTpTv6ftwRJwyXasGjU7L1swFnrizKh7nEeHnSbVMbs`:
+
+- Student roster synced on-chain (2 wallets)
+- Course `Matematicas 101` created (`course_id = 0`) — PDA [`GrPN2BRPQMPXK6rg21JunLek6fxxLBS6PbZDFbYGqPa4`](https://explorer.solana.com/address/GrPN2BRPQMPXK6rg21JunLek6fxxLBS6PbZDFbYGqPa4?cluster=devnet)
+- Achievement issued for Angel Serrano linked to that course — PDA [`5W71GVeQrAXThfNmzexFk8cR6S7eFVzM5Q5eddoGEPnz`](https://explorer.solana.com/address/5W71GVeQrAXThfNmzexFk8cR6S7eFVzM5Q5eddoGEPnz?cluster=devnet)
+
+![ScholarFi Achievement Vault on devnet — roster, course, emit, and on-chain catalog](docs/achievement-vault-devnet.png)
+
 ## Program
 
 - **Program name:** `scholarfi_lite_contracts`
