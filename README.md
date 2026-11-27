@@ -4,6 +4,10 @@ Anchor-based Solana program for **course-linked student credentials** with full 
 
 Teachers manage approved student lists, create courses, issue achievements, and mint classroom points into student ATAs — all as program-derived accounts.
 
+## Frontend
+
+The companion UI for this program is **[ScholarFi Achievement Vault](https://github.com/angeldavid218/scholarfi-achievement-vault/tree/spl-token)** (`spl-token` branch). That app talks to these contracts on Solana (roster, courses, achievements, and Token-2022 classroom rewards).
+
 ## Overview
 
 | Entity | PDA seeds | Create | Read | Update | Delete |
@@ -32,7 +36,7 @@ Legacy classic-SPL classroom mints (if any) must be replaced via `close_reward_m
 
 ## Evidence of functionality (devnet)
 
-End-to-end run via the ScholarFi Achievement Vault UI against program `7JTpTv6ftwRJwyXasGjU7L1swFnrizKh7nEeHnSbVMbs`:
+End-to-end run via the [ScholarFi Achievement Vault](https://github.com/angeldavid218/scholarfi-achievement-vault/tree/spl-token) UI against program `7JTpTv6ftwRJwyXasGjU7L1swFnrizKh7nEeHnSbVMbs`:
 
 - Classroom **Token-2022** mint `Puntos en el aula` / `MERIT` — [`CyyuupNxavjctfs1qQeypBFC8pxgQDFZtLMWe2eqcDy5`](https://explorer.solana.com/address/CyyuupNxavjctfs1qQeypBFC8pxgQDFZtLMWe2eqcDy5?cluster=devnet)
 - Token achievements rewarded on-chain (e.g. **20 MERIT** saldo enviado) with Explorer-linked Achievement PDAs
