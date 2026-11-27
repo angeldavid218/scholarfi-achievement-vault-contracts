@@ -31,6 +31,31 @@ pub struct StudentList {
     pub students: Vec<Pubkey>,
 }
 
+/// Teacher-scoped classroom reward token. One per teacher.
+#[account]
+#[derive(InitSpace)]
+pub struct RewardConfig {
+    pub teacher: Pubkey,
+    pub mint: Pubkey,
+    pub decimals: u8,
+    #[max_len(32)]
+    pub name: String,
+    #[max_len(10)]
+    pub symbol: String,
+    pub bump: u8,
+}
+
+/// Proves a token achievement was minted exactly once.
+#[account]
+#[derive(InitSpace)]
+pub struct RewardReceipt {
+    pub achievement: Pubkey,
+    pub student: Pubkey,
+    pub mint: Pubkey,
+    pub amount: u64,
+    pub bump: u8,
+}
+
 /// Teacher-owned course that achievements can optionally reference.
 #[account]
 #[derive(InitSpace)]

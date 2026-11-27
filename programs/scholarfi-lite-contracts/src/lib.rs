@@ -4,6 +4,11 @@ pub mod instructions;
 pub mod state;
 
 use anchor_lang::prelude::*;
+use anchor_spl::{
+    associated_token::AssociatedToken,
+    token_2022::Token2022,
+    token_interface::{Mint, TokenAccount, TokenInterface},
+};
 
 pub use constants::*;
 pub use state::*;
@@ -70,10 +75,7 @@ pub mod scholarfi_lite_contracts {
         )
     }
 
-    pub fn delete_achievement(
-        ctx: Context<DeleteAchievement>,
-        achievement_id: u64,
-    ) -> Result<()> {
+    pub fn delete_achievement(ctx: Context<DeleteAchievement>, achievement_id: u64) -> Result<()> {
         instructions::delete_achievement::handler(ctx, achievement_id)
     }
 
@@ -91,6 +93,28 @@ pub mod scholarfi_lite_contracts {
             achievement_type,
             course_id,
         )
+    }
+
+    pub fn create_reward_mint(
+        ctx: Context<CreateRewardMint>,
+        name: String,
+        symbol: String,
+        mint_id: u64,
+    ) -> Result<()> {
+        instructions::create_reward_mint::handler(ctx, name, symbol, mint_id)
+    }
+
+    pub fn close_reward_mint(ctx: Context<CloseRewardMint>, mint_id: u64) -> Result<()> {
+        instructions::close_reward_mint::handler(ctx, mint_id)
+    }
+
+    pub fn reward_achievement(
+        ctx: Context<RewardAchievement>,
+        achievement_id: u64,
+        amount: u64,
+        mint_id: u64,
+    ) -> Result<()> {
+        instructions::reward_achievement::handler(ctx, achievement_id, amount, mint_id)
     }
 }
 
@@ -292,4 +316,119 @@ pub struct UpdateAchievement<'info> {
         constraint = achievement.teacher == teacher.key() @ crate::error::ErrorCode::UnauthorizedTeacher,
     )]
     pub achievement: Account<'info, Achievement>,
+}
+
+#[derive(Accounts)]
+#[instruction(name: String, symbol: String, mint_id: u64)]
+pub struct CreateRewardMint<'info> {
+    #[account(mut)]
+    pub teacher: Signer<'info>,
+    #[account(
+        init,
+        payer = teacher,
+        mint::decimals = REWARD_DECIMALS,
+        mint::authority = reward_mint,
+        mint::token_program = token_program,
+        extensions::metadata_pointer::authority = reward_mint,
+        extensions::metadata_pointer::metadata_address = reward_mint,
+        extensions::close_authority::authority = reward_mint,
+        seeds = [REWARD_MINT_SEED, teacher.key().as_ref(), &mint_id.to_le_bytes()],
+        bump
+    )]
+    pub reward_mint: InterfaceAccount<'info, Mint>,
+    #[account(
+        init,
+        payer = teacher,
+        space = 8 + RewardConfig::INIT_SPACE,
+        seeds = [REWARD_CONFIG_SEED, teacher.key().as_ref()],
+        bump
+    )]
+    pub reward_config: Account<'info, RewardConfig>,
+    /// Token-2022 only — required for MetadataPointer / TokenMetadata / MintCloseAuthority.
+    #[account(address = Token2022::id() @ crate::error::ErrorCode::InvalidTokenProgram)]
+    pub token_program: Interface<'info, TokenInterface>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+#[instruction(mint_id: u64)]
+pub struct CloseRewardMint<'info> {
+    #[account(mut)]
+    pub teacher: Signer<'info>,
+    #[account(
+        mut,
+        seeds = [REWARD_CONFIG_SEED, teacher.key().as_ref()],
+        bump = reward_config.bump,
+        constraint = reward_config.teacher == teacher.key() @ crate::error::ErrorCode::UnauthorizedTeacher,
+        close = teacher
+    )]
+    pub reward_config: Account<'info, RewardConfig>,
+    /// Classic MERIT mint (old seeds) or Token-2022 mint (versioned seeds).
+    /// Ownership / supply checks and optional close happen in the handler.
+    /// CHECK: key must match `reward_config.mint`.
+    #[account(mut)]
+    pub reward_mint: UncheckedAccount<'info>,
+    pub token_program: Interface<'info, TokenInterface>,
+}
+
+#[derive(Accounts)]
+#[instruction(achievement_id: u64, amount: u64, mint_id: u64)]
+pub struct RewardAchievement<'info> {
+    #[account(mut)]
+    pub teacher: Signer<'info>,
+    /// CHECK: membership is enforced against the student list; key is the ATA owner.
+    pub student: UncheckedAccount<'info>,
+    #[account(
+        seeds = [STUDENT_LIST_SEED, teacher.key().as_ref()],
+        bump = student_list.bump,
+        constraint = student_list.teacher == teacher.key() @ crate::error::ErrorCode::UnauthorizedTeacher
+    )]
+    pub student_list: Account<'info, StudentList>,
+    #[account(
+        seeds = [
+            ACHIEVEMENT_SEED,
+            teacher.key().as_ref(),
+            student.key().as_ref(),
+            &achievement_id.to_le_bytes(),
+        ],
+        bump = achievement.bump,
+        constraint = achievement.teacher == teacher.key() @ crate::error::ErrorCode::UnauthorizedTeacher,
+        constraint = achievement.student == student.key() @ crate::error::ErrorCode::AchievementStudentMismatch,
+    )]
+    pub achievement: Account<'info, Achievement>,
+    #[account(
+        seeds = [REWARD_CONFIG_SEED, teacher.key().as_ref()],
+        bump = reward_config.bump,
+        constraint = reward_config.teacher == teacher.key() @ crate::error::ErrorCode::UnauthorizedTeacher,
+        constraint = reward_config.mint == reward_mint.key() @ crate::error::ErrorCode::RewardMintMismatch,
+    )]
+    pub reward_config: Account<'info, RewardConfig>,
+    #[account(
+        mut,
+        seeds = [REWARD_MINT_SEED, teacher.key().as_ref(), &mint_id.to_le_bytes()],
+        bump,
+        mint::authority = reward_mint,
+        mint::token_program = token_program,
+    )]
+    pub reward_mint: InterfaceAccount<'info, Mint>,
+    #[account(
+        init,
+        payer = teacher,
+        space = 8 + RewardReceipt::INIT_SPACE,
+        seeds = [REWARD_RECEIPT_SEED, achievement.key().as_ref()],
+        bump
+    )]
+    pub reward_receipt: Account<'info, RewardReceipt>,
+    #[account(
+        init_if_needed,
+        payer = teacher,
+        associated_token::mint = reward_mint,
+        associated_token::authority = student,
+        associated_token::token_program = token_program,
+    )]
+    pub student_token_account: InterfaceAccount<'info, TokenAccount>,
+    #[account(address = Token2022::id() @ crate::error::ErrorCode::InvalidTokenProgram)]
+    pub token_program: Interface<'info, TokenInterface>,
+    pub associated_token_program: Program<'info, AssociatedToken>,
+    pub system_program: Program<'info, System>,
 }
